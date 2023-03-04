@@ -4,7 +4,6 @@ use crate::encoding::bytes_to_hex_string;
 use ethers::prelude::abigen;
 use ethers::prelude::builders::ContractCall;
 use ethers::providers::Middleware;
-use ethers::signers::Signer;
 use ethers::types::Signature;
 use ethers::types::{Address, U256};
 use ethers::utils::keccak256;
