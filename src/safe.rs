@@ -122,7 +122,7 @@ impl<T: Transactionable> SafeTransaction<T> {
         refund_receiver: Option<Address>,
     ) -> anyhow::Result<Self> {
         let details = super::api::queued_details(chain_id, safe_address).await?;
-        let nonce = match SafeTransaction::match_calldata(&tx, &details)? {
+        let nonce = match SafeTransaction::match_calldata(&tx, safe_address, chain_id).await? {
             Some(matched_details) => match attempt_extract_nonce(&matched_details) {
                 Some(nonce) => {
                     debug!("Found nonce in transaction details");
@@ -163,15 +163,15 @@ impl<T: Transactionable> SafeTransaction<T> {
         })
     }
 
-    fn match_calldata(
+    pub async fn match_calldata(
         tx: &T,
-        tx_details: &[TransactionDetails],
+        safe_address: Address,
+        chain_id: u64,
     ) -> anyhow::Result<Option<TransactionDetails>> {
         let calldata = tx.calldata()?;
-        Ok(tx_details
-            .into_iter()
-            .find(|transaction_details| {
-                let TransactionDetails {
+        let tx_details = super::api::queued_details(chain_id, safe_address).await?;
+        Ok(tx_details.into_iter().find(|transaction_details| {
+            let TransactionDetails {
                 tx_data: Some(TransactionData {
                     hex_data: Some(data)
                     ,..
@@ -181,9 +181,8 @@ impl<T: Transactionable> SafeTransaction<T> {
                 return false;
             };
 
-                *data == "0x".to_owned() + &bytes_to_hex_string(&calldata)
-            })
-            .cloned())
+            *data == "0x".to_owned() + &bytes_to_hex_string(&calldata)
+        }))
     }
 
     pub async fn sign_safe_tx<S: 'static + ethers::signers::Signer>(
