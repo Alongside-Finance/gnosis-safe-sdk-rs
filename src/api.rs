@@ -1,11 +1,9 @@
+use crate::encoding::bytes_to_hex_string;
+use crate::safe::SignedSafePayload;
+use crate::transaction::Transactionable;
+use core::fmt::Debug;
 use ethers::types::transaction::eip712::Eip712;
 use ethers::types::Address;
-use futures::{stream, FutureExt, StreamExt, TryStreamExt};
-
-use crate::encoding::bytes_to_hex_string;
-use crate::transaction::Transactionable;
-use crate::types::SignedSafePayload;
-use core::fmt::Debug;
 use ethers::utils::to_checksum;
 use lazy_static::lazy_static;
 use reqwest::header::{HeaderName, HeaderValue};
