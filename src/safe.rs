@@ -4,6 +4,7 @@ use crate::encoding::bytes_to_hex_string;
 use ethers::prelude::abigen;
 use ethers::prelude::builders::ContractCall;
 use ethers::providers::Middleware;
+use ethers::signers::Signer;
 use ethers::types::Signature;
 use ethers::types::{Address, U256};
 use ethers::utils::keccak256;
@@ -186,15 +187,15 @@ impl<T: Transactionable> SafeTransaction<T> {
             .cloned())
     }
 
-    pub async fn sign_safe_tx(
+    pub async fn sign_safe_tx<S: 'static + ethers::signers::Signer>(
         self,
-        signer: &ethers::signers::Ledger,
+        signer: &S,
     ) -> anyhow::Result<SignedSafePayload<T>> {
-        info!("Signing Safe Transaction, Check your Ledger");
+        info!("Signing Safe Transaction");
         Ok(SignedSafePayload {
-            signature: signer.sign_typed_struct(&self).await?,
+            signature: signer.sign_typed_data(&self).await?,
             payload: self,
-            sender: signer.get_address().await?,
+            sender: signer.address(),
         })
     }
 }
