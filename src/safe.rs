@@ -203,10 +203,11 @@ impl<T: Transactionable> SignedSafePayload<T> {
     pub fn execute_contract_call<M: Middleware>(
         self,
         signatures: String,
-        instance: &GnosisSafe<M>,
+        client: std::sync::Arc<M>,
     ) -> anyhow::Result<ContractCall<M, bool>> {
         let SafeTransaction {
             tx,
+            safe_address,
             safe_tx_gas,
             base_gas,
             gas_price,
@@ -216,6 +217,8 @@ impl<T: Transactionable> SignedSafePayload<T> {
             operation,
             ..
         } = self.payload;
+
+        let instance = GnosisSafe::new(safe_address, client);
 
         let call: ethers::contract::builders::ContractCall<_, _> = instance.exec_transaction(
             tx.to(),
