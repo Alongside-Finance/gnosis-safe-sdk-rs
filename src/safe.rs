@@ -232,6 +232,11 @@ impl<T: Transactionable> SignedSafePayload<T> {
 
         Ok(call)
     }
+
+    #[allow(dead_code)]
+    async fn propose(self) -> anyhow::Result<TransactionDetails> {
+        super::api::propose(self).await
+    }
 }
 
 #[cfg(test)]

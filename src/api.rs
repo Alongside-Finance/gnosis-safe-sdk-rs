@@ -173,10 +173,10 @@ impl<T: Transactionable> From<SignedSafePayload<T>> for MultisigTransactionReque
 }
 
 pub async fn propose<T: Transactionable>(
-    chain_id: u64,
-    address: Address,
     tx: SignedSafePayload<T>,
 ) -> anyhow::Result<TransactionDetails> {
+    let chain_id = tx.payload.chain_id;
+    let address = tx.payload.safe_address;
     let checksummed_address = ethers::core::utils::to_checksum(&address, None);
     let tx = MultisigTransactionRequest::from(tx);
     friendly_execute(
