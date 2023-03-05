@@ -154,6 +154,7 @@ impl<T: Transactionable> From<SignedSafePayload<T>> for MultisigTransactionReque
         let inner = payload.tx;
         Self {
             to: to_checksum(&inner.to(), None),
+            // todo check encoding
             value: inner.value().to_string(),
             data: Option::Some("0x".to_owned() + &bytes_to_hex_string(inner.calldata().unwrap())),
             operation: payload.operation,

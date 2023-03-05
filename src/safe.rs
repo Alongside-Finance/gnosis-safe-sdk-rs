@@ -211,7 +211,6 @@ impl<T: Transactionable> SignedSafePayload<T> {
             gas_price,
             gas_token,
             refund_receiver,
-
             operation,
             ..
         } = self.payload;
