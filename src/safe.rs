@@ -121,7 +121,6 @@ impl<T: Transactionable> SafeTransaction<T> {
         gas_token: Option<Address>,
         refund_receiver: Option<Address>,
     ) -> anyhow::Result<Self> {
-        let details = super::api::queued_details(chain_id, safe_address).await?;
         let nonce = match SafeTransaction::match_calldata(&tx, safe_address, chain_id).await? {
             Some(matched_details) => match attempt_extract_nonce(&matched_details) {
                 Some(nonce) => {
@@ -202,7 +201,7 @@ impl<T: Transactionable> SignedSafePayload<T> {
     pub fn execute_contract_call<M: Middleware>(
         self,
         signatures: String,
-        client: std::sync::Arc<M>,
+        client: &std::sync::Arc<M>,
     ) -> anyhow::Result<ContractCall<M, bool>> {
         let SafeTransaction {
             tx,
@@ -217,7 +216,7 @@ impl<T: Transactionable> SignedSafePayload<T> {
             ..
         } = self.payload;
 
-        let instance = GnosisSafe::new(safe_address, client);
+        let instance = GnosisSafe::new(safe_address, client.clone());
 
         let call: ethers::contract::builders::ContractCall<_, _> = instance.exec_transaction(
             tx.to(),
