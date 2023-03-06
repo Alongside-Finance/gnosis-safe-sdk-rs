@@ -26,11 +26,11 @@ impl<T: Transactionable> Bundle<T> {
                     Operation::DELEGATE => 1,
                 }]);
 
-                // hard code value as 0 for nows 32 bytes
                 let encoded_value = pad(tx.value());
 
                 // returns 20 byte address
                 let encoded_address = bytes_to_hex_string(tx.to().as_bytes());
+
                 let encoded_data = bytes_to_hex_string(tx.calldata().unwrap());
 
                 // 2 char = 1 byte
