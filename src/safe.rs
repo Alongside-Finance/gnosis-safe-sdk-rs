@@ -27,20 +27,31 @@ pub struct SignedSafePayload<T: Transactionable> {
     pub sender: Address,
 }
 
+/// defaults to a CALL operation
+/// Defaults to getting the nonce from the contract
+#[derive(Debug, Clone)]
+pub struct SafeTransactionBuilder<T: Transactionable> {
+    pub tx: T,
+    pub chain_id: u64,
+    pub safe_address: Address,
+    pub safe_tx_gas: Option<U256>,
+    pub base_gas: Option<U256>,
+    pub gas_price: Option<U256>,
+    pub gas_token: Option<Address>,
+    pub refund_receiver: Option<Address>,
+    pub nonce: Option<U256>,
+    pub operation: Option<Operation>,
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct SafeTransaction<T: Transactionable> {
     pub tx: T,
     pub safe_address: Address,
     pub chain_id: u64,
-    /// u256::zero() for none
     pub safe_tx_gas: U256,
-    /// u256::zero() for none
     pub base_gas: U256,
-    /// u256::zero() for none
     pub gas_price: U256,
-    /// zero address for none
     pub gas_token: Address,
-    /// zero address for none
     pub refund_receiver: Address,
     pub nonce: U256,
     pub operation: Operation,
@@ -109,41 +120,108 @@ impl<T: Transactionable> Eip712 for SafeTransaction<T> {
     }
 }
 
+impl<T: Transactionable> SafeTransactionBuilder<T> {
+    async fn build(self) -> anyhow::Result<SafeTransaction<T>> {
+        let nonce = match self.nonce {
+            Some(nonce) => nonce,
+            None => self.next_nonce().await?,
+        };
+        Ok(SafeTransaction {
+            tx: self.tx,
+            chain_id: self.chain_id,
+            safe_address: self.safe_address,
+            safe_tx_gas: self.safe_tx_gas.unwrap_or(U256::from(0)),
+            base_gas: self.base_gas.unwrap_or(U256::from(0)),
+            gas_price: self.gas_price.unwrap_or(U256::from(0)),
+            gas_token: self.gas_token.unwrap_or(Address::zero()),
+            refund_receiver: self.refund_receiver.unwrap_or(Address::zero()),
+            nonce: nonce,
+            operation: self.operation.unwrap_or(Operation::CALL),
+        })
+    }
+
+    async fn next_nonce(&self) -> anyhow::Result<U256> {
+        Ok(U256::from(
+            crate::api::safes(self.chain_id, self.safe_address)
+                .await?
+                .safe_config
+                .nonce,
+        ))
+    }
+
+    fn new(tx: T, chain_id: u64, safe_address: Address) -> Self {
+        Self {
+            tx,
+            chain_id,
+            safe_address,
+            safe_tx_gas: None,
+            base_gas: None,
+            gas_price: None,
+            gas_token: None,
+            refund_receiver: None,
+            nonce: None,
+            operation: None,
+        }
+    }
+
+    pub fn safe_tx_gas(mut self, safe_tx_gas: U256) -> Self {
+        self.safe_tx_gas = Some(safe_tx_gas);
+        self
+    }
+
+    pub fn base_gas(mut self, base_gas: U256) -> Self {
+        self.base_gas = Some(base_gas);
+        self
+    }
+
+    pub fn gas_price(mut self, gas_price: U256) -> Self {
+        self.gas_price = Some(gas_price);
+        self
+    }
+
+    pub fn gas_token(mut self, gas_token: Address) -> Self {
+        self.gas_token = Some(gas_token);
+        self
+    }
+
+    pub fn refund_receiver(mut self, refund_receiver: Address) -> Self {
+        self.refund_receiver = Some(refund_receiver);
+        self
+    }
+
+    pub fn nonce(mut self, nonce: U256) -> Self {
+        self.nonce = Some(nonce);
+        self
+    }
+
+    pub fn operation(mut self, operation: Operation) -> Self {
+        self.operation = Some(operation);
+        self
+    }
+}
+
 impl<T: Transactionable> SafeTransaction<T> {
     pub async fn new(
         tx: T,
         chain_id: u64,
         safe_address: Address,
         operation: Operation,
-        maybe_nonce: Option<u64>,
-        safe_tx_gas: Option<U256>,
-        base_gas: Option<U256>,
-        gas_price: Option<U256>,
-        gas_token: Option<Address>,
-        refund_receiver: Option<Address>,
+        nonce: U256,
+        safe_tx_gas: U256,
+        base_gas: U256,
+        gas_price: U256,
+        gas_token: Address,
+        refund_receiver: Address,
     ) -> anyhow::Result<Self> {
-        let nonce = match maybe_nonce {
-            Some(nonce) => U256::from(nonce),
-            None => {
-                debug!("No nonce provided, getting a new nonce from contract");
-                U256::from(
-                    crate::api::safes(chain_id, safe_address)
-                        .await?
-                        .safe_config
-                        .nonce,
-                )
-            }
-        };
-
         Ok(Self {
             tx,
             chain_id,
             safe_address,
-            safe_tx_gas: safe_tx_gas.unwrap_or(U256::zero()),
-            base_gas: base_gas.unwrap_or(U256::zero()),
-            gas_price: gas_price.unwrap_or(U256::zero()),
-            gas_token: gas_token.unwrap_or(Address::zero()),
-            refund_receiver: refund_receiver.unwrap_or(Address::zero()),
+            safe_tx_gas: safe_tx_gas,
+            base_gas: base_gas,
+            gas_price: gas_price,
+            gas_token: gas_token,
+            refund_receiver: refund_receiver,
             nonce,
             operation,
         })
