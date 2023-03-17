@@ -121,7 +121,7 @@ impl<T: Transactionable> Eip712 for SafeTransaction<T> {
 }
 
 impl<T: Transactionable> SafeTransactionBuilder<T> {
-    async fn build(self) -> anyhow::Result<SafeTransaction<T>> {
+    pub async fn build(self) -> anyhow::Result<SafeTransaction<T>> {
         let nonce = match self.nonce {
             Some(nonce) => nonce,
             None => self.next_nonce().await?,
@@ -140,7 +140,7 @@ impl<T: Transactionable> SafeTransactionBuilder<T> {
         })
     }
 
-    async fn next_nonce(&self) -> anyhow::Result<U256> {
+    pub async fn next_nonce(&self) -> anyhow::Result<U256> {
         Ok(U256::from(
             crate::api::safes(self.chain_id, self.safe_address)
                 .await?
@@ -149,7 +149,7 @@ impl<T: Transactionable> SafeTransactionBuilder<T> {
         ))
     }
 
-    fn new(tx: T, chain_id: u64, safe_address: Address) -> Self {
+    pub fn new(tx: T, chain_id: u64, safe_address: Address) -> Self {
         Self {
             tx,
             chain_id,
