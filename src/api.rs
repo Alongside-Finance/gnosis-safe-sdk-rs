@@ -177,13 +177,16 @@ pub async fn propose<T: Transactionable>(
 ) -> anyhow::Result<TransactionDetails> {
     let chain_id = tx.payload.chain_id;
     let address = tx.payload.safe_address;
-    let checksummed_address = ethers::core::utils::to_checksum(&address, None);
     let tx = MultisigTransactionRequest::from(tx);
     friendly_execute(
         CLIENT
             .post(&api_url(
                 chain_id,
-                &["transactions", &checksummed_address, "propose"],
+                &[
+                    "transactions",
+                    &ethers::core::utils::to_checksum(&address, None),
+                    "propose",
+                ],
             ))
             .json(&tx),
     )

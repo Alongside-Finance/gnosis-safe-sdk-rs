@@ -115,39 +115,13 @@ impl<T: Transactionable> SafeTransaction<T> {
         chain_id: u64,
         safe_address: Address,
         operation: Operation,
+        nonce: Option<U256>,
         safe_tx_gas: Option<U256>,
         base_gas: Option<U256>,
         gas_price: Option<U256>,
         gas_token: Option<Address>,
         refund_receiver: Option<Address>,
     ) -> anyhow::Result<Self> {
-        let nonce = match SafeTransaction::match_calldata(&tx, safe_address, chain_id).await? {
-            Some(matched_details) => match attempt_extract_nonce(&matched_details) {
-                Some(nonce) => {
-                    debug!("Found nonce in transaction details");
-                    U256::from(nonce)
-                }
-                None => {
-                    debug!("Failed to extract nonce");
-                    U256::from(
-                        crate::api::safes(chain_id, safe_address)
-                            .await?
-                            .safe_config
-                            .nonce,
-                    )
-                }
-            },
-            None => {
-                debug!("No matching calldata found, getting a new nonce");
-                U256::from(
-                    crate::api::safes(chain_id, safe_address)
-                        .await?
-                        .safe_config
-                        .nonce,
-                )
-            }
-        };
-
         Ok(Self {
             tx,
             chain_id,
@@ -157,11 +131,20 @@ impl<T: Transactionable> SafeTransaction<T> {
             gas_price: gas_price.unwrap_or(U256::zero()),
             gas_token: gas_token.unwrap_or(Address::zero()),
             refund_receiver: refund_receiver.unwrap_or(Address::zero()),
-            nonce,
+            nonce: nonce.unwrap_or({
+                debug!("No nonce provided, getting a new nonce from contract");
+                U256::from(
+                    crate::api::safes(chain_id, safe_address)
+                        .await?
+                        .safe_config
+                        .nonce,
+                )
+            }),
             operation,
         })
     }
 
+    /// returns the first pending transactions that matches this calldata
     pub async fn match_calldata(
         tx: &T,
         safe_address: Address,

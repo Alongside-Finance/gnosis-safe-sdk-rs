@@ -4,8 +4,7 @@ use ethers::types::U256;
 use safe_client_gateway::common::models::data_decoded::Operation;
 use std::ops::Add;
 
-/// The selector for the Safe transaction data
-/// hex encoded: 0x8d80ff0a
+/// multiSend(bytes memory transactions)"
 const SELECTOR_BYTES: &[u8] = &[141, 128, 255, 10];
 
 #[derive(Debug, Clone)]
