@@ -115,13 +115,26 @@ impl<T: Transactionable> SafeTransaction<T> {
         chain_id: u64,
         safe_address: Address,
         operation: Operation,
-        nonce: Option<U256>,
+        maybe_nonce: Option<u64>,
         safe_tx_gas: Option<U256>,
         base_gas: Option<U256>,
         gas_price: Option<U256>,
         gas_token: Option<Address>,
         refund_receiver: Option<Address>,
     ) -> anyhow::Result<Self> {
+        let nonce = match maybe_nonce {
+            Some(nonce) => U256::from(nonce),
+            None => {
+                debug!("No nonce provided, getting a new nonce from contract");
+                U256::from(
+                    crate::api::safes(chain_id, safe_address)
+                        .await?
+                        .safe_config
+                        .nonce,
+                )
+            }
+        };
+
         Ok(Self {
             tx,
             chain_id,
@@ -131,15 +144,7 @@ impl<T: Transactionable> SafeTransaction<T> {
             gas_price: gas_price.unwrap_or(U256::zero()),
             gas_token: gas_token.unwrap_or(Address::zero()),
             refund_receiver: refund_receiver.unwrap_or(Address::zero()),
-            nonce: nonce.unwrap_or({
-                debug!("No nonce provided, getting a new nonce from contract");
-                U256::from(
-                    crate::api::safes(chain_id, safe_address)
-                        .await?
-                        .safe_config
-                        .nonce,
-                )
-            }),
+            nonce,
             operation,
         })
     }
