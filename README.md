@@ -1,4 +1,4 @@
-# gnosis-safe-sdk-rs
+# gnosis-safe-sdk-rs IN PROGRESS USE AT YOUR OWN RISK
 
 Features
   - Create ethers-rs contract calls to execute on transactions
