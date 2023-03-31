@@ -1,4 +1,5 @@
 use super::transaction::Transactionable;
+use crate::bundle::Bundle;
 use crate::constants::{DOMAIN_TYPE_HASH, PAYLOAD_TYPE_HASH};
 use crate::encoding::bytes_to_hex_string;
 use ethers::prelude::abigen;
@@ -140,15 +141,6 @@ impl<T: Transactionable> SafeTransactionBuilder<T> {
         })
     }
 
-    pub async fn next_nonce(&self) -> anyhow::Result<U256> {
-        Ok(U256::from(
-            crate::api::safes(self.chain_id, self.safe_address)
-                .await?
-                .safe_config
-                .nonce,
-        ))
-    }
-
     pub fn new(tx: T, chain_id: u64, safe_address: Address) -> Self {
         Self {
             tx,
@@ -162,6 +154,24 @@ impl<T: Transactionable> SafeTransactionBuilder<T> {
             nonce: None,
             operation: None,
         }
+    }
+
+    /// Sets the operation as delegate for the bundle
+    pub async fn from_bundle(
+        bundle: Bundle<T>,
+        chain_id: u64,
+        safe_address: Address,
+    ) -> SafeTransactionBuilder<Bundle<T>> {
+        SafeTransactionBuilder::new(bundle, chain_id, safe_address).operation(Operation::DELEGATE)
+    }
+
+    pub async fn next_nonce(&self) -> anyhow::Result<U256> {
+        Ok(U256::from(
+            crate::api::safes(self.chain_id, self.safe_address)
+                .await?
+                .safe_config
+                .nonce,
+        ))
     }
 
     pub fn safe_tx_gas(mut self, safe_tx_gas: U256) -> Self {
