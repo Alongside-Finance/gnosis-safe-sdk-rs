@@ -157,7 +157,7 @@ impl<T: Transactionable> SafeTransactionBuilder<T> {
     }
 
     /// Sets the operation as delegate for the bundle
-    pub async fn from_bundle(
+    pub fn from_bundle(
         bundle: Bundle<T>,
         chain_id: u64,
         safe_address: Address,
