@@ -15,39 +15,51 @@ pub struct Bundle<T: Transactionable> {
 }
 
 impl<T: Transactionable> Bundle<T> {
+    //
+    //
+    // From gnosis multisend contract:
+    // Sends multiple transactions and reverts all if one fails.
+    // Each transaction is encoded as a packed bytes of
+    // - operation as a uint8 with 0 for a call or 1 for a delegatecall (=> 1 byte),
+    // - to as a address (=> 20 bytes),
+    // - value as a uint256 (=> 32 bytes),
+    // - data length as a uint256 (=> 32 bytes),
+    // - data as bytes.
+    // see abi.encodePacked for more information on packed encoding
+    //
+    //
+    //
     pub fn new(transactions: Vec<(T, Operation)>) -> anyhow::Result<Self> {
-        let (encoded, value): (Vec<String>, Vec<U256>) = transactions
+        let (calldatas, value): (Vec<String>, Vec<U256>) = transactions
             .iter()
             .map(|(tx, op)| {
-                // 2 byte operation
-                let encoded_operation = bytes_to_hex_string(vec![match op {
-                    Operation::CALL => 0,
-                    Operation::DELEGATE => 1,
-                }]);
-
-                let encoded_value = pad(tx.value());
-
-                // returns 20 byte address
-                let encoded_address = bytes_to_hex_string(tx.to().as_bytes());
-
                 let encoded_data = bytes_to_hex_string(tx.calldata().unwrap());
 
-                // 2 char = 1 byte
                 let data_length = pad(U256::from(encoded_data.len() / 2));
 
-                let mut calldata = String::new();
-                calldata.push_str(&encoded_operation);
-                calldata.push_str(&encoded_address);
-                calldata.push_str(&encoded_value);
-                calldata.push_str(&data_length);
-                calldata.push_str(&encoded_data);
+                let multisend_encoded_calldata = [
+                    // 1 byte
+                    bytes_to_hex_string(vec![match op {
+                        Operation::CALL => 0,
+                        Operation::DELEGATE => 1,
+                    }]),
+                    // 20 bytes
+                    bytes_to_hex_string(tx.to().as_bytes()),
+                    // 32 bytes
+                    pad(tx.value()),
+                    // 32 bytes
+                    data_length,
+                    // bytes packed (no prefix)
+                    encoded_data,
+                ]
+                .concat();
 
-                (calldata, tx.value())
+                (multisend_encoded_calldata, tx.value())
             })
             .unzip();
 
         let encoded = ethers::abi::encode(&[ethers::abi::Token::Bytes(hex_string_to_bytes(
-            &encoded.join(""),
+            &calldatas.join(""),
         )?)]);
 
         Ok(Self {
