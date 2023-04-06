@@ -251,10 +251,12 @@ pub fn extract_sigs_from_details<T: Transactionable>(details: &TransactionDetail
 }
 
 pub async fn is_signed<T: Transactionable>(
-    tx: &SafeTransaction<T>,
-    signer: ethers::types::Address,
+    tx: &T,
+    safe_address: Address,
+    chain_id: u64,
+    signer: Address,
 ) -> anyhow::Result<bool> {
-    let details = match match_calldata(&tx.tx, tx.safe_address, tx.chain_id).await? {
+    let details = match match_calldata(tx, safe_address, chain_id).await? {
         Some(details) => details,
         None => return Ok(false),
     };
@@ -266,7 +268,7 @@ pub async fn is_signed<T: Transactionable>(
                     .confirmations
                     .into_iter()
                     .map(|confirm| confirm.signer.value.parse().unwrap())
-                    .collect::<Vec<ethers::types::Address>>();
+                    .collect::<Vec<Address>>();
 
                 println!("all signers: {:?}", all_signers);
 
