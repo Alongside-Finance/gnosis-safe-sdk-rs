@@ -13,11 +13,12 @@ use ethers::{
     abi::Token,
     types::transaction::eip712::{EIP712Domain, Eip712, Eip712Error},
 };
+use itertools::Itertools;
 use safe_client_gateway::common::models::data_decoded::Operation;
 use safe_client_gateway::routes::transactions::models::details::{
     DetailedExecutionInfo, TransactionData, TransactionDetails,
 };
-use tracing::{debug, info};
+use tracing::info;
 
 abigen!(GnosisSafe, "abi/gnosis_safe.json",);
 
@@ -258,6 +259,32 @@ impl<T: Transactionable> SafeTransaction<T> {
 
             *data == "0x".to_owned() + &bytes_to_hex_string(&calldata)
         }))
+    }
+
+    pub fn extract_sigs_from_details(details: &TransactionDetails) -> String {
+        let mut confirms = match details.detailed_execution_info.clone() {
+            Some(tx_type) => match tx_type {
+                DetailedExecutionInfo::Multisig(multisig) => multisig.confirmations,
+                _ => {
+                    return "".to_string();
+                }
+            },
+            None => {
+                return "".to_string();
+            }
+        };
+
+        confirms.sort_by(|a, b| {
+            a.signer
+                .value
+                .to_ascii_lowercase()
+                .cmp(&b.signer.value.to_ascii_lowercase())
+        });
+
+        confirms
+            .into_iter()
+            .filter_map(|confirm| confirm.signature.map(|sig| sig.replace("0x", "")))
+            .join("")
     }
 
     pub async fn sign_safe_tx<S: 'static + ethers::signers::Signer>(

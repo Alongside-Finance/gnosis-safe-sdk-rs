@@ -1689,6 +1689,7 @@ dependencies = [
  "ethers",
  "futures",
  "hex",
+ "itertools",
  "lazy_static",
  "reqwest",
  "safe-client-gateway",
