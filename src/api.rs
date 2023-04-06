@@ -250,7 +250,7 @@ pub fn extract_sigs_from_details<T: Transactionable>(details: &TransactionDetail
     )
 }
 
-pub fn is_signed<T: Transactionable>(details: &TransactionDetails, signer: Address) -> bool {
+pub fn is_signed(details: &TransactionDetails, signer: Address) -> bool {
     match details.detailed_execution_info.clone() {
         Some(info) => match info {
             DetailedExecutionInfo::Multisig(multisig_info) => {
