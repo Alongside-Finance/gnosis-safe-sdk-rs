@@ -249,3 +249,31 @@ pub fn extract_sigs_from_details<T: Transactionable>(details: &TransactionDetail
             .collect(),
     )
 }
+
+pub async fn is_signed<T: Transactionable>(
+    tx: &SafeTransaction<T>,
+    signer: ethers::types::Address,
+) -> anyhow::Result<bool> {
+    let details = match match_calldata(&tx.tx, tx.safe_address, tx.chain_id).await? {
+        Some(details) => details,
+        None => return Ok(false),
+    };
+
+    match details.detailed_execution_info {
+        Some(info) => match info {
+            DetailedExecutionInfo::Multisig(multisig_info) => {
+                let all_signers = multisig_info
+                    .confirmations
+                    .into_iter()
+                    .map(|confirm| confirm.signer.value.parse().unwrap())
+                    .collect::<Vec<ethers::types::Address>>();
+
+                println!("all signers: {:?}", all_signers);
+
+                Ok(all_signers.contains(&signer))
+            }
+            _ => Ok(false),
+        },
+        None => Ok(false),
+    }
+}
