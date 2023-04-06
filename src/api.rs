@@ -1,6 +1,7 @@
 use crate::encoding::bytes_to_hex_string;
 use crate::safe::SignedSafePayload;
 use crate::transaction::Transactionable;
+use crate::types::SafeTransaction;
 use core::fmt::Debug;
 use ethers::types::transaction::eip712::Eip712;
 use ethers::types::Address;
@@ -9,6 +10,9 @@ use lazy_static::lazy_static;
 use reqwest::header::{HeaderName, HeaderValue};
 use safe_client_gateway::common::models::data_decoded::Operation;
 use safe_client_gateway::common::models::page::Page;
+use safe_client_gateway::routes::transactions::models::details::{
+    DetailedExecutionInfo, TransactionData,
+};
 use safe_client_gateway::routes::{
     safes::models::SafeState,
     transactions::models::{
@@ -191,4 +195,57 @@ pub async fn propose<T: Transactionable>(
             .json(&tx),
     )
     .await
+}
+
+/// returns the first pending transactions that matches this calldata
+pub async fn match_calldata<T: Transactionable>(
+    tx: &T,
+    safe_address: Address,
+    chain_id: u64,
+) -> anyhow::Result<Option<TransactionDetails>> {
+    let calldata = tx.calldata()?;
+    let tx_details = super::api::queued_details(chain_id, safe_address).await?;
+    Ok(tx_details.into_iter().find(|transaction_details| {
+        let TransactionDetails {
+                tx_data: Some(TransactionData {
+                    hex_data: Some(data)
+                    ,..
+                })
+                ,..
+            } = transaction_details else {
+                return false;
+            };
+
+        *data == "0x".to_owned() + &bytes_to_hex_string(&calldata)
+    }))
+}
+
+pub fn extract_sigs_from_details<T: Transactionable>(details: &TransactionDetails) -> String {
+    let confirms = match details.detailed_execution_info.clone() {
+        Some(tx_type) => match tx_type {
+            DetailedExecutionInfo::Multisig(multisig) => multisig.confirmations,
+            _ => {
+                return "".to_string();
+            }
+        },
+        None => {
+            return "".to_string();
+        }
+    };
+
+    SafeTransaction::<T>::sort_and_join_sigs(
+        &confirms
+            .into_iter()
+            .filter_map(|c| match c.signer.value.parse::<ethers::types::Address>() {
+                Ok(address) => match c.signature {
+                    Some(sig) => Some((address, sig)),
+                    None => None,
+                },
+                Err(_) => {
+                    debug!("could not parse address {}", c.signer.value);
+                    None
+                }
+            })
+            .collect(),
+    )
 }

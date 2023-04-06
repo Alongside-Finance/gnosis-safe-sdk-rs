@@ -1,7 +1,6 @@
 use super::transaction::Transactionable;
 use crate::bundle::Bundle;
 use crate::constants::{DOMAIN_TYPE_HASH, PAYLOAD_TYPE_HASH};
-use crate::encoding::bytes_to_hex_string;
 use ethers::prelude::abigen;
 use ethers::prelude::builders::ContractCall;
 use ethers::providers::Middleware;
@@ -16,7 +15,7 @@ use ethers::{
 use itertools::Itertools;
 use safe_client_gateway::common::models::data_decoded::Operation;
 use safe_client_gateway::routes::transactions::models::details::{
-    DetailedExecutionInfo, TransactionData, TransactionDetails,
+    DetailedExecutionInfo, TransactionDetails,
 };
 use tracing::info;
 
@@ -238,52 +237,12 @@ impl<T: Transactionable> SafeTransaction<T> {
         })
     }
 
-    /// returns the first pending transactions that matches this calldata
-    pub async fn match_calldata(
-        tx: &T,
-        safe_address: Address,
-        chain_id: u64,
-    ) -> anyhow::Result<Option<TransactionDetails>> {
-        let calldata = tx.calldata()?;
-        let tx_details = super::api::queued_details(chain_id, safe_address).await?;
-        Ok(tx_details.into_iter().find(|transaction_details| {
-            let TransactionDetails {
-                tx_data: Some(TransactionData {
-                    hex_data: Some(data)
-                    ,..
-                })
-                ,..
-            } = transaction_details else {
-                return false;
-            };
-
-            *data == "0x".to_owned() + &bytes_to_hex_string(&calldata)
-        }))
-    }
-
-    pub fn extract_sigs_from_details(details: &TransactionDetails) -> String {
-        let mut confirms = match details.detailed_execution_info.clone() {
-            Some(tx_type) => match tx_type {
-                DetailedExecutionInfo::Multisig(multisig) => multisig.confirmations,
-                _ => {
-                    return "".to_string();
-                }
-            },
-            None => {
-                return "".to_string();
-            }
-        };
-
-        confirms.sort_by(|a, b| {
-            a.signer
-                .value
-                .to_ascii_lowercase()
-                .cmp(&b.signer.value.to_ascii_lowercase())
-        });
-
-        confirms
+    pub fn sort_and_join_sigs(sigs: &Vec<(Address, String)>) -> String {
+        let mut cloned = sigs.clone();
+        cloned.sort_by(|a, b| a.0.cmp(&b.0));
+        cloned
             .into_iter()
-            .filter_map(|confirm| confirm.signature.map(|sig| sig.replace("0x", "")))
+            .map(|(_, sig)| sig.replace("0x", ""))
             .join("")
     }
 
@@ -334,10 +293,6 @@ impl<T: Transactionable> SignedSafePayload<T> {
         );
 
         Ok(call)
-    }
-
-    pub async fn propose(self) -> anyhow::Result<TransactionDetails> {
-        super::api::propose(self).await
     }
 }
 
