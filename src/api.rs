@@ -250,18 +250,8 @@ pub fn extract_sigs_from_details<T: Transactionable>(details: &TransactionDetail
     )
 }
 
-pub async fn is_signed<T: Transactionable>(
-    tx: &T,
-    safe_address: Address,
-    chain_id: u64,
-    signer: Address,
-) -> anyhow::Result<bool> {
-    let details = match match_calldata(tx, safe_address, chain_id).await? {
-        Some(details) => details,
-        None => return Ok(false),
-    };
-
-    match details.detailed_execution_info {
+pub fn is_signed<T: Transactionable>(details: &TransactionDetails, signer: Address) -> bool {
+    match details.detailed_execution_info.clone() {
         Some(info) => match info {
             DetailedExecutionInfo::Multisig(multisig_info) => {
                 let all_signers = multisig_info
@@ -272,10 +262,10 @@ pub async fn is_signed<T: Transactionable>(
 
                 println!("all signers: {:?}", all_signers);
 
-                Ok(all_signers.contains(&signer))
+                all_signers.contains(&signer)
             }
-            _ => Ok(false),
+            _ => false,
         },
-        None => Ok(false),
+        None => false,
     }
 }
