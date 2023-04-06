@@ -258,7 +258,7 @@ impl<T: Transactionable> SafeTransaction<T> {
         })
     }
 
-    pub fn execute_contract_call<M: Middleware>(
+    pub fn contract_call<M: Middleware>(
         self,
         signatures: String,
         client: &std::sync::Arc<M>,
