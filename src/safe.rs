@@ -257,9 +257,7 @@ impl<T: Transactionable> SafeTransaction<T> {
             sender: signer.address(),
         })
     }
-}
 
-impl<T: Transactionable> SignedSafePayload<T> {
     pub fn execute_contract_call<M: Middleware>(
         self,
         signatures: String,
@@ -275,7 +273,7 @@ impl<T: Transactionable> SignedSafePayload<T> {
             refund_receiver,
             operation,
             ..
-        } = self.payload;
+        } = self;
 
         let instance = GnosisSafe::new(safe_address, client.clone());
 
