@@ -1,7 +1,8 @@
-use crate::encoding::{bytes_to_hex_string, hex_string_to_bytes};
 use crate::transaction::Transactionable;
+use crate::types::Operation;
+use anyhow::Ok;
+use ethers::abi::Uint;
 use ethers::types::U256;
-use safe_client_gateway::common::models::data_decoded::Operation;
 use std::ops::Add;
 
 /// multiSend(bytes memory transactions)"
@@ -15,42 +16,40 @@ pub struct Bundle<T: Transactionable> {
 }
 
 impl<T: Transactionable> Bundle<T> {
-    //
-    //
-    // From gnosis multisend contract:
-    // Sends multiple transactions and reverts all if one fails.
-    // Each transaction is encoded as a packed bytes of
-    // - operation as a uint8 with 0 for a call or 1 for a delegatecall (=> 1 byte),
-    // - to as a address (=> 20 bytes),
-    // - value as a uint256 (=> 32 bytes),
-    // - data length as a uint256 (=> 32 bytes),
-    // - data as bytes.
-    // see abi.encodePacked for more information on packed encoding
-    //
-    //
-    //
+    ///
+    ///
+    /// From gnosis multisend contract:
+    /// Sends multiple transactions and reverts all if one fails.
+    /// Each transaction is encoded as a packed bytes of
+    /// - operation as a uint8 with 0 for a call or 1 for a delegatecall (=> 1 byte),
+    /// - to as a address (=> 20 bytes),
+    /// - value as a uint256 (=> 32 bytes),
+    /// - data length as a uint256 (=> 32 bytes),
+    /// - data as bytes.
+    /// see abi.encodePacked for more information on packed encoding
+    ///
+    ///
+    ///
     pub fn new(transactions: Vec<(T, Operation)>) -> anyhow::Result<Self> {
-        let (calldatas, value): (Vec<String>, Vec<U256>) = transactions
+        let (calldatas, value): (Vec<Vec<u8>>, Vec<U256>) = transactions
             .iter()
             .map(|(tx, op)| {
-                let encoded_data = bytes_to_hex_string(tx.calldata().unwrap());
-
-                let data_length = pad(U256::from(encoded_data.len() / 2));
+                let encoded_data = tx.calldata().unwrap_or(vec![]);
 
                 let multisend_encoded_calldata = [
                     // 1 byte
-                    bytes_to_hex_string(vec![match op {
-                        Operation::CALL => 0,
-                        Operation::DELEGATE => 1,
-                    }]),
+                    &[match op {
+                        Operation::CALL => 0 as u8,
+                        Operation::DELEGATE => 1 as u8,
+                    }],
                     // 20 bytes
-                    bytes_to_hex_string(tx.to().as_bytes()),
+                    tx.to().as_bytes(),
                     // 32 bytes
-                    pad(tx.value()),
+                    &abi_encode_uint(&tx.value()),
                     // 32 bytes
-                    data_length,
+                    &abi_encode_uint(&Uint::from(encoded_data.len())),
                     // bytes packed (no prefix)
-                    encoded_data,
+                    &encoded_data,
                 ]
                 .concat();
 
@@ -58,9 +57,7 @@ impl<T: Transactionable> Bundle<T> {
             })
             .unzip();
 
-        let encoded = ethers::abi::encode(&[ethers::abi::Token::Bytes(hex_string_to_bytes(
-            &calldatas.join(""),
-        )?)]);
+        let encoded = ethers::abi::encode(&[ethers::abi::Token::Bytes(calldatas.concat())]);
 
         Ok(Self {
             calldata: vec![SELECTOR_BYTES, &encoded].concat(),
@@ -72,9 +69,8 @@ impl<T: Transactionable> Bundle<T> {
     }
 }
 
-fn pad(value: U256) -> String {
-    let unpadded_hex = format!("{:x}", value);
-    String::from("0").repeat(64 - unpadded_hex.len()) + &unpadded_hex
+fn abi_encode_uint(num: &U256) -> Vec<u8> {
+    ethers::abi::encode(&[ethers::abi::Token::Uint(Uint::from(num))])
 }
 
 impl<T: Transactionable> Transactionable for Bundle<T> {
@@ -113,7 +109,7 @@ fn test_encoding() {
     println!("len: {len}");
 
     assert_eq!(
-        pad(num),
+        bytes_to_hex_string(abi_encode_uint(&num)),
         "0000000000000000000000000000000000000000000000000000000000000016",
     );
     assert_eq!(encoded_value.len(), 64);
